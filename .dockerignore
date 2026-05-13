@@ -1,0 +1,14 @@
+.env
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+.venv/
+voice-agent/.venv/
+.uv/
+diagnostics/
+client/
+*.txt
+*.md
+.gemini/
