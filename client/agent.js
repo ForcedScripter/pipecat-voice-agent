@@ -26,8 +26,8 @@ class VoiceAgent {
 
     /* Public API */
 
-    async connect(lang = 'hi-IN') {
-        console.log('[VoiceAgent] connect() called, lang:', lang);
+    async connect(lang = 'hi-IN', voice = 'shubh') {
+        console.log('[VoiceAgent] connect() called, lang:', lang, 'voice:', voice);
         try {
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -40,7 +40,7 @@ class VoiceAgent {
             });
             console.log('[VoiceAgent] mic access granted');
 
-            const url = `${this.wsBaseUrl}?lang=${lang}`;
+            const url = `${this.wsBaseUrl}?lang=${lang}&voice=${voice}`;
             console.log('[VoiceAgent] connecting to WebSocket:', url);
             this.ws = new WebSocket(url);
             this.ws.binaryType = 'arraybuffer';
