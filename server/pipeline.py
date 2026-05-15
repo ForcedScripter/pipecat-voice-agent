@@ -75,10 +75,11 @@ Goal: Help users quickly, clearly, and naturally in realtime voice.
 async def create_pipeline(
     websocket,
     language: str = "hi-IN",
+    voice: str = "shubh",
     session_id: str | None = None,
 ):
     sid = session_id or "-"
-    logger.info("Creating pipeline | session_id={} language={}", sid, language)
+    logger.info("Creating pipeline | session_id={} language={} voice={}", sid, language, voice)
 
     # -- Transport
     # RTVIProcessor() has NO transport= argument so it does NOT disable audio on start.
@@ -144,7 +145,7 @@ async def create_pipeline(
         sample_rate=SAMPLE_RATE,
         settings=SarvamTTSService.Settings(
             model="bulbul:v3",
-            voice="shubh",
+            voice=voice,
             language=Language.HI_IN if language == "hi-IN" else Language.EN_IN,
             pace=1.15,      # Slightly faster speech = less audio to generate
             pitch=0.0,
@@ -164,7 +165,9 @@ async def create_pipeline(
     logger.info("RTVI processor created | session_id={}", sid)
 
     # -- LLM context
-    context = LLMContext(messages=[{"role": "system", "content": SYSTEM_PROMPT}])
+    lang_name = "Hindi" if language == "hi-IN" else "English"
+    dynamic_prompt = f"{SYSTEM_PROMPT}\n\nIMPORTANT: The user has selected {lang_name}. You MUST respond entirely in {lang_name}."
+    context = LLMContext(messages=[{"role": "system", "content": dynamic_prompt}])
 
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,

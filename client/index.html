@@ -91,10 +91,18 @@
   <div class="orb" id="orb"></div>
   <div id="status">Disconnected</div>
 
-  <select id="lang-select">
-    <option value="hi-IN">Hindi (hi-IN)</option>
-    <option value="en-IN">English India (en-IN)</option>
-  </select>
+  <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+    <select id="lang-select" style="margin-bottom: 0;">
+      <option value="hi-IN">Hindi (hi-IN)</option>
+      <option value="en-IN">English India (en-IN)</option>
+    </select>
+    <select id="gender-select" style="margin-bottom: 0;">
+      <option value="male">Male</option>
+      <option value="female">Female</option>
+    </select>
+    <select id="voice-select" style="margin-bottom: 0;">
+    </select>
+  </div>
 
   <div class="btn-row">
     <button id="connect-btn">Connect</button>
@@ -108,6 +116,27 @@
     const connectBtn    = document.getElementById('connect-btn');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const langSelect    = document.getElementById('lang-select');
+    const genderSelect  = document.getElementById('gender-select');
+    const voiceSelect   = document.getElementById('voice-select');
+
+    const voiceOptions = {
+      male: ['shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'varun', 'kabir'],
+      female: ['ritu', 'priya', 'neha', 'pooja', 'kavya', 'roopa', 'shruti']
+    };
+
+    function updateVoiceDropdown() {
+      const gender = genderSelect.value;
+      voiceSelect.innerHTML = '';
+      voiceOptions[gender].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+        voiceSelect.appendChild(opt);
+      });
+    }
+
+    genderSelect.addEventListener('change', updateVoiceDropdown);
+    updateVoiceDropdown(); // Initial population
 
     class UIVoiceAgent extends VoiceAgent {
       _onConnected() {
@@ -116,6 +145,8 @@
         connectBtn.disabled = true;
         disconnectBtn.disabled = false;
         langSelect.disabled = true;
+        genderSelect.disabled = true;
+        voiceSelect.disabled = true;
       }
       _onDisconnected() {
         statusEl.textContent = 'Disconnected';
@@ -123,6 +154,8 @@
         connectBtn.disabled = false;
         disconnectBtn.disabled = true;
         langSelect.disabled = false;
+        genderSelect.disabled = false;
+        voiceSelect.disabled = false;
       }
       _onBotStartedSpeaking() {
         statusEl.textContent = '🤖 Bot speaking...';
@@ -142,9 +175,9 @@
       }
     }
 
-    window.agent = new UIVoiceAgent('ws://localhost:8808/ws');
+    window.agent = new UIVoiceAgent('ws://localhost:8805/ws');
 
-    connectBtn.onclick = () => agent.connect(langSelect.value);
+    connectBtn.onclick = () => agent.connect(langSelect.value, voiceSelect.value);
     disconnectBtn.onclick = () => agent.disconnect();
   </script>
 

@@ -132,18 +132,19 @@ async def websocket_endpoint(websocket: WebSocket):
     # ── All gates passed — accept ─────────────────────────
     await websocket.accept()
     session_start = time.monotonic()
+    language = websocket.query_params.get("lang", "hi-IN")
+    voice = websocket.query_params.get("voice", "shubh")
+
     logger.info(
-        "Client connected | session_id={} ip={} lang={}",
+        "Client connected | session_id={} ip={} lang={} voice={}",
         session_id,
         client_ip,
-        websocket.query_params.get("lang", "hi-IN"),
+        language,
+        voice,
     )
 
-    # Accept ?lang=hi-IN or ?lang=en-IN
-    language = websocket.query_params.get("lang", "hi-IN")
-
     try:
-        transport, task = await create_pipeline(websocket, language=language)
+        transport, task = await create_pipeline(websocket, language=language, voice=voice)
 
         @transport.event_handler("on_client_connected")
         async def on_connected(t, ws):
