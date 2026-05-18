@@ -144,7 +144,12 @@ async def websocket_endpoint(websocket: WebSocket):
     )
 
     try:
-        transport, task = await create_pipeline(websocket, language=language, voice=voice)
+        transport, task = await create_pipeline(
+            websocket,
+            language=language,
+            voice=voice,
+            session_id=session_id,
+        )
 
         @transport.event_handler("on_client_connected")
         async def on_connected(t, ws):

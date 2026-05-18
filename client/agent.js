@@ -20,6 +20,7 @@ class VoiceAgent {
         this.isConnected = false;
         this._playQueue = [];
         this._isPlaying = false;
+        this._playbackTime = 0;
         this._audioFramesSent = 0;
         this._micHealthTimer = null;
     }
@@ -111,6 +112,7 @@ class VoiceAgent {
 
         source.connect(this.workletNode);
         console.log('[VoiceAgent] audio capture pipeline connected');
+        this._drainPlayQueue();
     }
 
     /* Incoming messages */
@@ -167,33 +169,42 @@ class VoiceAgent {
 
     _enqueueAudio(arrayBuffer) {
         this._playQueue.push(arrayBuffer);
-        if (!this._isPlaying) this._playNext();
+        this._drainPlayQueue();
     }
 
-    async _playNext() {
-        if (this._playQueue.length === 0) {
-            this._isPlaying = false;
-            return;
-        }
-        this._isPlaying = true;
-        const buf = this._playQueue.shift();
-        try {
-            if (!this.audioContext) return;
-            const pcm16 = new Int16Array(buf);
-            const float32 = new Float32Array(pcm16.length);
-            for (let i = 0; i < pcm16.length; i++) {
-                float32[i] = pcm16[i] / 32768;
+    /**
+     * Schedule TTS chunks on the Web Audio timeline so chunks play back-to-back
+     * instead of waiting for each buffer to finish (which added seconds of delay).
+     */
+    _drainPlayQueue() {
+        if (!this.audioContext) return;
+
+        const sampleRate = this.audioContext.sampleRate || 16000;
+
+        while (this._playQueue.length > 0) {
+            const buf = this._playQueue.shift();
+            try {
+                const pcm16 = new Int16Array(buf);
+                const float32 = new Float32Array(pcm16.length);
+                for (let i = 0; i < pcm16.length; i++) {
+                    float32[i] = pcm16[i] / 32768;
+                }
+                const audioBuffer = this.audioContext.createBuffer(1, float32.length, sampleRate);
+                audioBuffer.getChannelData(0).set(float32);
+
+                const source = this.audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(this.audioContext.destination);
+
+                const now = this.audioContext.currentTime;
+                if (this._playbackTime < now) {
+                    this._playbackTime = now;
+                }
+                source.start(this._playbackTime);
+                this._playbackTime += audioBuffer.duration;
+            } catch (err) {
+                console.error('[VoiceAgent] playback error:', err);
             }
-            const audioBuffer = this.audioContext.createBuffer(1, float32.length, 16000);
-            audioBuffer.getChannelData(0).set(float32);
-            const source = this.audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(this.audioContext.destination);
-            source.onended = () => this._playNext();
-            source.start();
-        } catch (err) {
-            console.error('[VoiceAgent] playback error:', err);
-            this._playNext();
         }
     }
 
@@ -213,6 +224,7 @@ class VoiceAgent {
         this.isConnected = false;
         this._playQueue = [];
         this._isPlaying = false;
+        this._playbackTime = 0;
         this._audioFramesSent = 0;
         if (this._micHealthTimer) { clearTimeout(this._micHealthTimer); this._micHealthTimer = null; }
         if (this.workletNode) { this.workletNode.disconnect(); this.workletNode = null; }

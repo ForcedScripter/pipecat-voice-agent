@@ -1,9 +1,14 @@
 from loguru import logger
 
-# -- Smart Turn
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
-from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
-from pipecat.turns.user_start import TranscriptionUserTurnStartStrategy
+# -- Turn strategies (low-latency path uses VAD + speech timeout, not Smart Turn)
+from pipecat.turns.user_stop import (
+    SpeechTimeoutUserTurnStopStrategy,
+    TurnAnalyzerUserTurnStopStrategy,
+)
+from pipecat.turns.user_start import (
+    TranscriptionUserTurnStartStrategy,
+    VADUserTurnStartStrategy,
+)
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 # -- VAD
@@ -41,7 +46,19 @@ from pipecat.transports.websocket.fastapi import (
 from pipecat.transcriptions.language import Language
 
 # -- Config and custom processors
-from config import CEREBRAS_API_KEY, SARVAM_API_KEY, LLM_MODEL, SAMPLE_RATE
+from config import (
+    CEREBRAS_API_KEY,
+    SARVAM_API_KEY,
+    LLM_MODEL,
+    SAMPLE_RATE,
+    VAD_START_SECS,
+    VAD_STOP_SECS,
+    VAD_MIN_VOLUME,
+    USER_SPEECH_TIMEOUT,
+    USE_SMART_TURN,
+    TTS_ENABLE_PREPROCESSING,
+    TTS_PACE,
+)
 from serializers.raw_pcm import RawPCMSerializer
 from processors.pivot_detector import PivotDetectorProcessor
 from processors.naturalizer import ResponseNaturalizerProcessor
@@ -72,6 +89,34 @@ Goal: Help users quickly, clearly, and naturally in realtime voice.
 """
 
 
+def _build_turn_strategies():
+    """Prefer VAD + speech-timeout over Smart Turn for lower end-of-utterance latency."""
+    if USE_SMART_TURN:
+        from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import (
+            LocalSmartTurnAnalyzerV3,
+        )
+
+        turn_stop = TurnAnalyzerUserTurnStopStrategy(
+            turn_analyzer=LocalSmartTurnAnalyzerV3()
+        )
+        logger.info("Turn stop: Smart Turn v3 (higher quality, higher latency)")
+    else:
+        turn_stop = SpeechTimeoutUserTurnStopStrategy(
+            user_speech_timeout=USER_SPEECH_TIMEOUT,
+        )
+        logger.info(
+            "Turn stop: speech timeout ({:.2f}s after VAD stop)",
+            USER_SPEECH_TIMEOUT,
+        )
+
+    # VAD starts the user turn immediately; transcription is a soft-speech fallback.
+    turn_start = [
+        VADUserTurnStartStrategy(),
+        TranscriptionUserTurnStartStrategy(use_interim=False),
+    ]
+    return UserTurnStrategies(start=turn_start, stop=[turn_stop])
+
+
 async def create_pipeline(
     websocket,
     language: str = "hi-IN",
@@ -82,9 +127,8 @@ async def create_pipeline(
     logger.info("Creating pipeline | session_id={} language={} voice={}", sid, language, voice)
 
     # -- Transport
-    # RTVIProcessor() has NO transport= argument so it does NOT disable audio on start.
-    # SileroVADAnalyzer drives voice activity detection locally in the transport.
-    # vad_signals=False in STT so Sarvam doesn't try to handle VAD itself.
+    # Silero VAD handles endpointing locally. Sarvam STT must NOT run its own VAD
+    # (vad_signals=False) or you get double-endpointing and hundreds of ms extra delay.
     transport = FastAPIWebsocketTransport(
         websocket=websocket,
         params=FastAPIWebsocketParams(
@@ -98,23 +142,23 @@ async def create_pipeline(
             serializer=RawPCMSerializer(),
             vad_analyzer=SileroVADAnalyzer(
                 params=VADParams(
-                    stop_secs=0.15,   # Aggressive endpointing for sub-second latency
-                    min_volume=0.15,  # More sensitive to quieter speakers
+                    start_secs=VAD_START_SECS,
+                    stop_secs=VAD_STOP_SECS,
+                    min_volume=VAD_MIN_VOLUME,
                 )
             ),
         ),
     )
-    logger.info("Transport created | session_id={}", sid)
-
-    # -- Smart Turn
-    smart_turn_stop = TurnAnalyzerUserTurnStopStrategy(
-        turn_analyzer=LocalSmartTurnAnalyzerV3()
+    logger.info(
+        "Transport created | session_id={} vad start={:.2f}s stop={:.2f}s",
+        sid,
+        VAD_START_SECS,
+        VAD_STOP_SECS,
     )
-    transcription_turn_start = TranscriptionUserTurnStartStrategy(use_interim=True)
-    logger.info("Turn strategies created | session_id={}", sid)
+
+    turn_strategies = _build_turn_strategies()
 
     # -- STT
-    # vad_signals=False: VAD is handled by Silero in the transport, not by Sarvam
     stt = SarvamSTTService(
         api_key=SARVAM_API_KEY,
         mode="transcribe",
@@ -122,11 +166,11 @@ async def create_pipeline(
         settings=SarvamSTTService.Settings(
             model="saaras:v3",
             language=Language.HI_IN if language == "hi-IN" else Language.EN_IN,
-            vad_signals=True,
-            high_vad_sensitivity=True,
+            vad_signals=False,
+            high_vad_sensitivity=False,
         ),
     )
-    logger.info("STT service created | session_id={}", sid)
+    logger.info("STT service created | session_id={} vad_signals=False", sid)
 
     # -- LLM
     llm = CerebrasLLMService(
@@ -134,7 +178,7 @@ async def create_pipeline(
         settings=CerebrasLLMService.Settings(
             model=LLM_MODEL,
             temperature=0.6,
-            max_completion_tokens=150,  # Force concise responses for faster TTS
+            max_completion_tokens=150,
         ),
     )
     logger.info("LLM service created | session_id={}", sid)
@@ -147,35 +191,38 @@ async def create_pipeline(
             model="bulbul:v3",
             voice=voice,
             language=Language.HI_IN if language == "hi-IN" else Language.EN_IN,
-            pace=1.15,      # Slightly faster speech = less audio to generate
+            pace=TTS_PACE,
             pitch=0.0,
-            enable_preprocessing=True,
+            enable_preprocessing=TTS_ENABLE_PREPROCESSING,
             temperature=0.7,
         ),
     )
-    logger.info("TTS service created | session_id={}", sid)
+    logger.info(
+        "TTS service created | session_id={} preprocessing={}",
+        sid,
+        TTS_ENABLE_PREPROCESSING,
+    )
 
     # -- Custom processors
     pivot_detector = PivotDetectorProcessor()
     naturalizer = ResponseNaturalizerProcessor(add_starters=True)
-    logger.info("Custom processors created | session_id={}", sid)
 
     # -- RTVI: no transport= so it does NOT gate audio behind client-ready handshake
     rtvi = RTVIProcessor()
-    logger.info("RTVI processor created | session_id={}", sid)
 
     # -- LLM context
     lang_name = "Hindi" if language == "hi-IN" else "English"
-    dynamic_prompt = f"{SYSTEM_PROMPT}\n\nIMPORTANT: The user has selected {lang_name}. You MUST respond entirely in {lang_name}."
+    dynamic_prompt = (
+        f"{SYSTEM_PROMPT}\n\n"
+        f"IMPORTANT: The user has selected {lang_name}. "
+        f"You MUST respond entirely in {lang_name}."
+    )
     context = LLMContext(messages=[{"role": "system", "content": dynamic_prompt}])
 
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            user_turn_strategies=UserTurnStrategies(
-                start=[transcription_turn_start],
-                stop=[smart_turn_stop],
-            ),
+            user_turn_strategies=turn_strategies,
         ),
         assistant_params=LLMAssistantAggregatorParams(),
     )
@@ -184,16 +231,16 @@ async def create_pipeline(
     # -- Pipeline
     pipeline = Pipeline(
         [
-            transport.input(),  # raw audio from browser
-            stt,  # audio -> TranscriptionFrame
-            user_aggregator,  # turn detection + LLM context
-            pivot_detector,  # topic-change detection
-            llm,  # text -> streaming response
-            naturalizer,  # clean robotic phrases
-            tts,  # text -> audio chunks
-            rtvi,  # RTVI events to browser
-            assistant_aggregator,  # store reply in context
-            transport.output(),  # stream audio to browser
+            transport.input(),
+            stt,
+            user_aggregator,
+            pivot_detector,
+            llm,
+            naturalizer,
+            tts,
+            rtvi,
+            assistant_aggregator,
+            transport.output(),
         ]
     )
     logger.info("Pipeline assembled | session_id={}", sid)
