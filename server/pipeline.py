@@ -65,6 +65,8 @@ from processors.audio_gate import AudioGateProcessor
 from processors.client_interrupt import ClientInterruptProcessor
 from processors.turn_reset import TurnResetProcessor
 from processors.turn_logger import TurnLifecycleProcessor
+from processors.rag_injector import RAGContextInjectorProcessor
+from rag_service import RAGService
 
 
 def get_system_prompt(language: str) -> str:
@@ -136,6 +138,7 @@ async def create_pipeline(
     websocket,
     language: str = "en-IN",
     session_id: str | None = None,
+    rag_service: RAGService | None = None,
 ):
     sid = session_id or "-"
     logger.info("Creating pipeline | session_id={} language={}", sid, language)
@@ -220,6 +223,12 @@ async def create_pipeline(
     naturalizer = ResponseNaturalizerProcessor(add_starters=True, language=language)
     llm_empty_guard = LLMEmptyGuardProcessor()
 
+    # -- RAG context injector
+    rag_injector = RAGContextInjectorProcessor(
+        rag_service=rag_service,
+        max_context_chars=1500,
+    )
+
     audio_gate = AudioGateProcessor(barge_in_rms=0.04, decay_secs=0.35)
     logger.info("Custom processors created | session_id={}", sid)
 
@@ -264,6 +273,7 @@ async def create_pipeline(
             turn_logger,  # [Turn] lifecycle logs
             context_sanitizer,  # sanitize + trim before LLM
             pivot_detector,  # topic-change detection
+            rag_injector,  # inject user-uploaded context chunks
             llm,  # text -> streaming response
             naturalizer,  # clean robotic phrases
             llm_empty_guard,  # inject fallback if LLM produced nothing

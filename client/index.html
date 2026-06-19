@@ -89,7 +89,15 @@
   <p class="sub">Speak naturally — no button to hold. Just talk.</p>
 
   <div class="orb" id="orb"></div>
-  <div id="status">Disconnected</div>
+  <div id="status" style="margin-bottom: 32px;">Disconnected</div>
+
+  <!-- Dynamic RAG Document Upload Container -->
+  <div class="upload-container" style="margin-bottom: 32px; display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 320px; background: #181824; border: 1px solid #2d2d3d; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+    <label for="doc-input" style="font-size: 0.85rem; color: #a5b4fc; font-weight: 600; text-align: left; display: block; margin-bottom: 4px;">📂 Temporary Demo RAG Doc</label>
+    <input type="file" id="doc-input" accept=".txt,.docx" style="font-size: 0.8rem; background: #0c0c12; border: 1px dashed #4f46e5; border-radius: 8px; padding: 10px; color: #ccc; cursor: pointer; width: 100%;" />
+    <button id="upload-btn" style="background: #10b981; color: #fff; font-size: 0.85rem; padding: 10px 16px; border-radius: 8px; margin-top: 6px;">Index Document</button>
+    <div id="upload-status" style="font-size: 0.75rem; color: #10b981; margin-top: 4px; text-align: center; min-height: 1rem;"></div>
+  </div>
 
   <select id="lang-select">
     <option value="hi-IN">Hindi (hi-IN)</option>
@@ -108,6 +116,13 @@
     const connectBtn    = document.getElementById('connect-btn');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const langSelect    = document.getElementById('lang-select');
+    const uploadBtn     = document.getElementById('upload-btn');
+    const docInput      = document.getElementById('doc-input');
+    const uploadStatus  = document.getElementById('upload-status');
+
+    // Generate unique session ID for dynamic RAG mapping
+    const sessionId = crypto.randomUUID();
+    console.log('[UI] Initialized Session ID:', sessionId);
 
     class UIVoiceAgent extends VoiceAgent {
       _onConnected() {
@@ -142,7 +157,46 @@
       }
     }
 
-    window.agent = new UIVoiceAgent('ws://localhost:8906/ws');
+    // Instantiates UI Agent targeting the unique session WebSocket endpoint
+    window.agent = new UIVoiceAgent(`ws://localhost:8906/ws?session_id=${sessionId}`);
+
+    // Dynamic document upload and indexing handler
+    uploadBtn.onclick = async () => {
+      const file = docInput.files[0];
+      if (!file) {
+        uploadStatus.style.color = '#ef4444';
+        uploadStatus.textContent = 'Please select a file first.';
+        return;
+      }
+
+      uploadStatus.style.color = '#a5b4fc';
+      uploadStatus.textContent = 'Uploading & indexing...';
+      uploadBtn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch(`http://localhost:8906/upload?session_id=${sessionId}`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+          uploadStatus.style.color = '#10b981';
+          uploadStatus.textContent = `Indexed successfully (${result.chunks} chunks)`;
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (err) {
+        console.error('[UI] Upload error:', err);
+        uploadStatus.style.color = '#ef4444';
+        uploadStatus.textContent = `Error: ${err.message}`;
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    };
 
     connectBtn.onclick = () => agent.connect(langSelect.value);
     disconnectBtn.onclick = () => agent.disconnect();

@@ -66,7 +66,9 @@ class VoiceAgent {
             });
             console.log('[VoiceAgent] mic access granted');
 
-            const url = `${this.wsBaseUrl}?lang=${lang}`;
+            const url = this.wsBaseUrl.includes('?') 
+                ? `${this.wsBaseUrl}&lang=${lang}` 
+                : `${this.wsBaseUrl}?lang=${lang}`;
             console.log('[VoiceAgent] connecting to WebSocket:', url);
             this.ws = new WebSocket(url);
             this.ws.binaryType = 'arraybuffer';
