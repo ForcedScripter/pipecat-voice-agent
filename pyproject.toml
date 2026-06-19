@@ -1,0 +1,24 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.13.5",
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "noisereduce>=3.0.3",
+    "numpy<2.0",
+    "pipecat-ai[cartesia,cerebras,deepgram,groq,sarvam,silero,websocket]>=1.1.0",
+    "python-dotenv>=1.2.2",
+    "scipy>=1.17.1",
+    "torch>=2.11.0",
+    "uvicorn[standard]>=0.46.0",
+    "pipecat[torchaudio]>=0.3.0",
+    "qdrant-client>=1.12.0",
+    "sentence-transformers>=3.0.0",
+    "python-docx",
+    "python-multipart",
+]

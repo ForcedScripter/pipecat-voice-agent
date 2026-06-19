@@ -33,4 +33,4 @@ RUN uv pip install --system deepfilternet
 # Install rest of project dependencies
 RUN uv pip install --system .
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "server"]

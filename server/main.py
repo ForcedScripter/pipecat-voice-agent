@@ -21,6 +21,14 @@ QDRANT_PATH = str(_ROOT_DIR / "qdrant_db")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Voice Agent server starting up...")
+    try:
+        from rag_service import get_shared_embed_model, get_shared_qdrant_client
+        logger.info("[lifespan] Pre-warming shared embedding model and Qdrant client...")
+        await asyncio.to_thread(get_shared_embed_model, "BAAI/bge-base-en-v1.5")
+        await asyncio.to_thread(get_shared_qdrant_client)
+        logger.info("[lifespan] Pre-warming complete. All shared resources ready.")
+    except Exception as e:
+        logger.error("[lifespan] Failed to pre-warm resources: {}", e)
     yield
     logger.info("Voice Agent server shutting down.")
 
@@ -149,7 +157,7 @@ async def websocket_endpoint(websocket: WebSocket):
     )
 
     # Accept ?lang=hi-IN or ?lang=en-IN
-    language = websocket.query_params.get("lang", "hi-IN")
+    language = websocket.query_params.get("lang", "en-IN")
     
     # Initialize dynamic RAGService for this session
     collection_name = f"session_{session_id}"

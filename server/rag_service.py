@@ -7,6 +7,7 @@ from sentence_transformers import SentenceTransformer
 
 # Shared thread-safe in-memory QdrantClient instance to avoid file locks
 _GLOBAL_QDRANT_CLIENT = None
+_GLOBAL_EMBED_MODEL = None
 
 def get_shared_qdrant_client() -> QdrantClient:
     global _GLOBAL_QDRANT_CLIENT
@@ -14,6 +15,13 @@ def get_shared_qdrant_client() -> QdrantClient:
         logger.info("[RAG] Initializing shared in-memory QdrantClient")
         _GLOBAL_QDRANT_CLIENT = QdrantClient(location=":memory:")
     return _GLOBAL_QDRANT_CLIENT
+
+def get_shared_embed_model(model_name: str) -> SentenceTransformer:
+    global _GLOBAL_EMBED_MODEL
+    if _GLOBAL_EMBED_MODEL is None:
+        logger.info("[RAG] Loading shared SentenceTransformer model | {}", model_name)
+        _GLOBAL_EMBED_MODEL = SentenceTransformer(model_name)
+    return _GLOBAL_EMBED_MODEL
 
 class RAGService:
     """Dynamic RAG service supporting Qdrant session-level vector collections."""
@@ -42,9 +50,8 @@ class RAGService:
         # Connect to shared in-memory Qdrant Client to avoid locking
         self._client = get_shared_qdrant_client()
         
-        # Load local embedding model (free, offline, no API key needed)
-        self._embed_model = SentenceTransformer(embed_model_name)
-        logger.info("[RAG] Local embedding model loaded | {}", embed_model_name)
+        # Load shared embedding model (free, offline, no API key needed)
+        self._embed_model = get_shared_embed_model(embed_model_name)
 
     def _embed_sync(self, texts: list[str]) -> list[list[float]]:
         """Embed list of query strings (synchronous, runs in thread pool)."""
