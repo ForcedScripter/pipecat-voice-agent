@@ -22,3 +22,7 @@ dependencies = [
     "python-docx",
     "python-multipart",
 ]
+
+[tool.setuptools]
+packages = ["server"]
+
