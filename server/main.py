@@ -10,8 +10,7 @@ from loguru import logger
 from pathlib import Path
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.frames.frames import LLMMessagesAppendFrame
-# from config import CEREBRAS_API_KEY, SARVAM_API_KEY, CARTESIA_API_KEY  # [SARVAM] — uncomment to revert
-from config import CEREBRAS_API_KEY, RINGG_API_KEY, CARTESIA_API_KEY
+from config import CEREBRAS_API_KEY, SARVAM_API_KEY, CARTESIA_API_KEY, RINGG_API_KEY
 from pipeline import create_pipeline
 from rag_service import RAGService
 
@@ -55,7 +54,6 @@ async def ready():
     missing = []
     if not CEREBRAS_API_KEY:
         missing.append("CEREBRAS_API_KEY")
-    # [SARVAM] — uncomment to revert:
     # if not SARVAM_API_KEY:
     #     missing.append("SARVAM_API_KEY")
     if not RINGG_API_KEY:

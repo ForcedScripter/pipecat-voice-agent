@@ -35,8 +35,8 @@ from pipecat.processors.frameworks.rtvi.observer import RTVIObserver
 
 # -- Services
 from pipecat.services.cerebras.llm import CerebrasLLMService
-# from pipecat.services.sarvam.stt import SarvamSTTService  # [SARVAM] — uncomment to revert
-from pipecat_ringg.stt import RinggSTTService, RinggSTTParams
+# from pipecat.services.sarvam.stt import SarvamSTTService
+from pipecat_ringg import RinggSTTService, RinggSTTParams
 from pipecat.services.cartesia.tts import CartesiaTTSService
 
 # -- Transport
@@ -51,7 +51,7 @@ from pipecat.transcriptions.language import Language
 # -- Config and custom processors
 from config import (
     CEREBRAS_API_KEY,
-    # SARVAM_API_KEY,  # [SARVAM] — uncomment to revert
+    SARVAM_API_KEY,
     RINGG_API_KEY,
     CARTESIA_API_KEY,
     LLM_MODEL,
@@ -182,8 +182,7 @@ async def create_pipeline(
     )
     client_interrupt = ClientInterruptProcessor()
 
-    # -- STT ----------------------------------------------------------------
-    # [SARVAM] — Original Sarvam STT (uncomment this block & comment Ringg to revert)
+    # -- STT (keeping Sarvam STT — best for Indian languages)
     # stt = SarvamSTTService(
     #     api_key=SARVAM_API_KEY,
     #     mode="transcribe",
@@ -198,21 +197,19 @@ async def create_pipeline(
     #         start_speech_volume_threshold=-45,
     #     ),
     # )
-    # logger.info("STT service created (Sarvam) | session_id={}", sid)
 
-    # [RINGG] — Active: Ringg Parrot STT V1 (Hindi-English code-mixed, ~60ms latency)
+    # -- STT (Ringg AI Integration)
     ringg_lang = "hi" if language == "hi-IN" else "en"
     stt = RinggSTTService(
-        sample_rate=SAMPLE_RATE,
+        base_url=None,
         params=RinggSTTParams(
             api_key=RINGG_API_KEY,
             language=ringg_lang,
             mode="stream",
-            enable_cap_punc=True,
-            accept_client_vad_events=True,
-        ),
+            enable_cap_punc=True
+        )
     )
-    logger.info("STT service created (Ringg) | session_id={} lang={}", sid, ringg_lang)
+    logger.info("STT service created | session_id={}", sid)
 
     # -- LLM
     llm = CerebrasLLMService(
