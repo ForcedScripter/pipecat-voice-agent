@@ -47,6 +47,7 @@ from pipecat.transports.websocket.fastapi import (
 
 # -- Language
 from pipecat.transcriptions.language import Language
+from pipecat.services.stt_service import STTSettings
 
 # -- Config and custom processors
 from config import (
@@ -207,6 +208,10 @@ async def create_pipeline(
             language=ringg_lang,
             mode="stream",
             enable_cap_punc=True
+        ),
+        settings=STTSettings(
+            model="ringg",
+            language=Language.HI_IN if language == "hi-IN" else Language.EN_IN
         )
     )
     logger.info("STT service created | session_id={}", sid)
