@@ -35,7 +35,8 @@ from pipecat.processors.frameworks.rtvi.observer import RTVIObserver
 
 # -- Services
 from pipecat.services.cerebras.llm import CerebrasLLMService
-from pipecat.services.sarvam.stt import SarvamSTTService
+# from pipecat.services.sarvam.stt import SarvamSTTService  # [SARVAM] — uncomment to revert
+from pipecat_ringg.stt import RinggSTTService, RinggSTTParams
 from pipecat.services.cartesia.tts import CartesiaTTSService
 
 # -- Transport
@@ -50,7 +51,8 @@ from pipecat.transcriptions.language import Language
 # -- Config and custom processors
 from config import (
     CEREBRAS_API_KEY,
-    SARVAM_API_KEY,
+    # SARVAM_API_KEY,  # [SARVAM] — uncomment to revert
+    RINGG_API_KEY,
     CARTESIA_API_KEY,
     LLM_MODEL,
     SAMPLE_RATE,
@@ -180,22 +182,37 @@ async def create_pipeline(
     )
     client_interrupt = ClientInterruptProcessor()
 
-    # -- STT (keeping Sarvam STT — best for Indian languages)
-    stt = SarvamSTTService(
-        api_key=SARVAM_API_KEY,
-        mode="transcribe",
+    # -- STT ----------------------------------------------------------------
+    # [SARVAM] — Original Sarvam STT (uncomment this block & comment Ringg to revert)
+    # stt = SarvamSTTService(
+    #     api_key=SARVAM_API_KEY,
+    #     mode="transcribe",
+    #     sample_rate=SAMPLE_RATE,
+    #     settings=SarvamSTTService.Settings(
+    #         model="saaras:v3",
+    #         language=Language.HI_IN if language == "hi-IN" else Language.EN_IN,
+    #         vad_signals=False,
+    #         high_vad_sensitivity=False,
+    #         positive_speech_threshold=0.4,
+    #         negative_speech_threshold=0.3,
+    #         start_speech_volume_threshold=-45,
+    #     ),
+    # )
+    # logger.info("STT service created (Sarvam) | session_id={}", sid)
+
+    # [RINGG] — Active: Ringg Parrot STT V1 (Hindi-English code-mixed, ~60ms latency)
+    ringg_lang = "hi" if language == "hi-IN" else "en"
+    stt = RinggSTTService(
         sample_rate=SAMPLE_RATE,
-        settings=SarvamSTTService.Settings(
-            model="saaras:v3",
-            language=Language.HI_IN if language == "hi-IN" else Language.EN_IN,
-            vad_signals=False,
-            high_vad_sensitivity=False,
-            positive_speech_threshold=0.4,
-            negative_speech_threshold=0.3,
-            start_speech_volume_threshold=-45,
+        params=RinggSTTParams(
+            api_key=RINGG_API_KEY,
+            language=ringg_lang,
+            mode="stream",
+            enable_cap_punc=True,
+            accept_client_vad_events=True,
         ),
     )
-    logger.info("STT service created | session_id={}", sid)
+    logger.info("STT service created (Ringg) | session_id={} lang={}", sid, ringg_lang)
 
     # -- LLM
     llm = CerebrasLLMService(

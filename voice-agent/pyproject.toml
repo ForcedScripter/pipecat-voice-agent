@@ -21,6 +21,7 @@ dependencies = [
     "sentence-transformers>=3.0.0",
     "python-docx",
     "python-multipart",
+    "pipecat-ringg @ git+https://github.com/Stonkr/pipecat-ringg.git",
 ]
 
 [tool.setuptools]

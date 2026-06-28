@@ -1897,6 +1897,20 @@ websocket = [
     { name = "fastapi" },
     { name = "websockets" },
 ]
+websockets-base = [
+    { name = "websockets" },
+]
+
+[[package]]
+name = "pipecat-ringg"
+version = "0.1.0"
+source = { git = "https://github.com/Stonkr/pipecat-ringg.git#ee49ed678d79e6f3a13aa8da4b7e8a539a348008" }
+dependencies = [
+    { name = "loguru" },
+    { name = "pipecat-ai", extra = ["websockets-base"] },
+    { name = "pydantic" },
+    { name = "ringglabs" },
+]
 
 [[package]]
 name = "platformdirs"
@@ -2390,6 +2404,19 @@ wheels = [
 ]
 
 [[package]]
+name = "ringglabs"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/32/4da3ae722a4323defe67460cff44b8f7bda50c7cb85ef44cb992cbb198c4/ringglabs-0.1.0.tar.gz", hash = "sha256:8168e119f615937232b05689f0933b1c0eba3a5d6f0d407d29573e3e7e5907e0", size = 21902, upload-time = "2026-04-28T09:25:56.997Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/09/19d542c493a608551b69e5f109a6577394de2f67ed1c09c6af2c007c51a0/ringglabs-0.1.0-py3-none-any.whl", hash = "sha256:1a347d3d57aeea27d2901450c20abf4a48d04376eaea1f856c8a7df33b0f6799", size = 20202, upload-time = "2026-04-28T09:25:55.681Z" },
+]
+
+[[package]]
 name = "safetensors"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2878,6 +2905,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pipecat" },
     { name = "pipecat-ai", extra = ["cartesia", "deepgram", "groq", "sarvam", "websocket"] },
+    { name = "pipecat-ringg" },
     { name = "python-docx" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
@@ -2898,6 +2926,7 @@ requires-dist = [
     { name = "numpy", specifier = "<2.0" },
     { name = "pipecat", extras = ["torchaudio"], specifier = ">=0.3.0" },
     { name = "pipecat-ai", extras = ["cartesia", "cerebras", "deepgram", "groq", "sarvam", "silero", "websocket"], specifier = ">=1.1.0" },
+    { name = "pipecat-ringg", git = "https://github.com/Stonkr/pipecat-ringg.git" },
     { name = "python-docx" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-multipart" },
